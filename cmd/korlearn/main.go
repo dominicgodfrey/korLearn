@@ -17,37 +17,53 @@ import (
 	"github.com/dominicgodfrey/korLearn/internal/api"
 	"github.com/dominicgodfrey/korLearn/internal/seed"
 	"github.com/dominicgodfrey/korLearn/internal/store"
+	"github.com/dominicgodfrey/korLearn/internal/tts"
 )
 
 func main() {
-	var (
-		addr        = flag.String("addr", "localhost:8080", "listen address")
-		dbPath      = flag.String("db", "korlearn.db", "path to the SQLite database")
-		contentPath = flag.String("content", "content", "directory of seed lesson files")
-	)
+	var cfg config
+	flag.StringVar(&cfg.addr, "addr", "localhost:8080", "listen address")
+	flag.StringVar(&cfg.dbPath, "db", "korlearn.db", "path to the SQLite database")
+	flag.StringVar(&cfg.contentPath, "content", "content", "directory of seed lesson files")
+	flag.StringVar(&cfg.ttsCache, "tts-cache", "cache/tts", "directory for synthesized audio")
+	flag.StringVar(&cfg.ttsURL, "tts-url", "http://localhost:8123", "base URL of the Python TTS sidecar")
+	flag.StringVar(&cfg.ttsVoice, "tts-voice", "", "sidecar voice (empty uses the sidecar default)")
 	flag.Parse()
 
-	if err := run(*addr, *dbPath, *contentPath); err != nil {
+	if err := run(cfg); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(addr, dbPath, contentPath string) error {
-	db, err := store.Open(dbPath)
+type config struct {
+	addr        string
+	dbPath      string
+	contentPath string
+	ttsCache    string
+	ttsURL      string
+	ttsVoice    string
+}
+
+func run(cfg config) error {
+	db, err := store.Open(cfg.dbPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	lessons, err := loadContent(context.Background(), db, contentPath)
+	lessons, err := loadContent(context.Background(), db, cfg.contentPath)
 	if err != nil {
 		return err
 	}
-	log.Printf("loaded %d lessons from %s into %s", lessons, contentPath, dbPath)
+	log.Printf("loaded %d lessons from %s into %s", lessons, cfg.contentPath, cfg.dbPath)
 
-	srv := api.New(db)
-	log.Printf("listening on http://%s", addr)
-	return http.ListenAndServe(addr, srv.Routes())
+	// The sidecar is a separate process and is not contacted until the first
+	// audio request, so it can be started, stopped, or missing independently.
+	audio := tts.New(cfg.ttsCache, cfg.ttsURL, cfg.ttsVoice)
+
+	srv := api.New(db, audio)
+	log.Printf("listening on http://%s", cfg.addr)
+	return http.ListenAndServe(cfg.addr, srv.Routes())
 }
 
 // loadContent parses and loads every lesson file, returning how many it found.

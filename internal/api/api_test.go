@@ -10,6 +10,7 @@ import (
 
 	"github.com/dominicgodfrey/korLearn/internal/seed"
 	"github.com/dominicgodfrey/korLearn/internal/store"
+	"github.com/dominicgodfrey/korLearn/internal/tts"
 )
 
 func newTestServer(t *testing.T) (*httptest.Server, *store.DB) {
@@ -35,7 +36,15 @@ func newTestServer(t *testing.T) (*httptest.Server, *store.DB) {
 		t.Fatal(err)
 	}
 
-	srv := httptest.NewServer(New(db).Routes())
+	// A stand-in for the Python sidecar, so the tts endpoint is exercised
+	// without a model or a GPU.
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "audio/wav")
+		w.Write([]byte("RIFF....WAVEfake"))
+	}))
+	t.Cleanup(sidecar.Close)
+
+	srv := httptest.NewServer(New(db, tts.New(t.TempDir(), sidecar.URL, "kf_a")).Routes())
 	t.Cleanup(srv.Close)
 	return srv, db
 }
@@ -118,7 +127,7 @@ func TestEmptyChaptersSerializeAsArray(t *testing.T) {
 	}
 	defer db.Close()
 
-	srv := httptest.NewServer(New(db).Routes())
+	srv := httptest.NewServer(New(db, nil).Routes())
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/api/chapters")
