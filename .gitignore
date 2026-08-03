@@ -1,0 +1,21 @@
+# Build output
+/korlearn
+/korlearn.exe
+/web/dist/
+
+# Local state — never committed, regenerated from content/ on startup
+*.db
+*.db-shm
+*.db-wal
+/cache/
+
+# Dependencies
+/node_modules/
+/web/node_modules/
+/sidecar/.venv/
+__pycache__/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
