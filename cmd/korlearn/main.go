@@ -16,12 +16,26 @@ import (
 	"os"
 
 	"github.com/dominicgodfrey/korLearn/internal/api"
+	"github.com/dominicgodfrey/korLearn/internal/lint"
 	"github.com/dominicgodfrey/korLearn/internal/seed"
 	"github.com/dominicgodfrey/korLearn/internal/store"
 	"github.com/dominicgodfrey/korLearn/internal/tts"
 )
 
 func main() {
+	// `korlearn lint [dir]` reads content straight from disk and never touches
+	// the database, so it is handled before any of the server flags.
+	if len(os.Args) > 1 && os.Args[1] == "lint" {
+		dir := "content"
+		if len(os.Args) > 2 {
+			dir = os.Args[2]
+		}
+		if err := runLint(dir); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	var cfg config
 	flag.StringVar(&cfg.addr, "addr", "localhost:8080", "listen address")
 	flag.StringVar(&cfg.dbPath, "db", "korlearn.db", "path to the SQLite database")
@@ -72,6 +86,37 @@ func run(cfg config) error {
 	srv := api.New(db, audio)
 	log.Printf("listening on http://%s", cfg.addr)
 	return http.ListenAndServe(cfg.addr, srv.Routes())
+}
+
+// runLint reports vocabulary used before it is taught.
+//
+// It always exits 0, even with findings. The check cannot be precise about an
+// agglutinative language — see the lint package — so failing on its output
+// would block real content over guesses. It is a prompt to look, not a verdict.
+func runLint(dir string) error {
+	// os.DirFS defers opening, so a missing directory would otherwise surface
+	// as a bare syscall error naming "." rather than the path asked for.
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("cannot read content directory %s: %w", dir, err)
+	}
+
+	lessons, err := seed.LoadDir(os.DirFS(dir))
+	if err != nil {
+		// Unparseable content is a genuine error, unlike a lint finding.
+		return err
+	}
+
+	findings := lint.Run(lessons)
+	for _, f := range findings {
+		fmt.Println(f)
+	}
+	if len(findings) == 0 {
+		fmt.Printf("%d lessons checked, nothing to review\n", len(lessons))
+		return nil
+	}
+	fmt.Printf("\n%d lessons checked, %d to review (warnings only, nothing is blocked)\n",
+		len(lessons), len(findings))
+	return nil
 }
 
 // prewarmAudio synthesizes every vocab word up front so that no card in a study
