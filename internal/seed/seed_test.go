@@ -136,6 +136,20 @@ func TestParseErrors(t *testing.T) {
 			want: "not declared",
 		},
 		{
+			name: "duplicate exercise prompt",
+			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+				"exercises":[{"kind":"fill_blank","prompt":"p","answer":["a"]},
+				             {"kind":"fill_blank","prompt":"p","answer":["b"]}]}`,
+			want: "same kind and prompt as exercises[0]",
+		},
+		{
+			name: "duplicate passage",
+			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+				"passages":[{"korean":"k","questions":[{"q":"q","reference":"r"}]},
+				            {"korean":"k","questions":[{"q":"q2","reference":"r"}]}]}`,
+			want: "same korean text as passages[0]",
+		},
+		{
 			name: "passage question without reference",
 			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
 				"passages":[{"korean":"k","questions":[{"q":"q","reference":""}]}]}`,

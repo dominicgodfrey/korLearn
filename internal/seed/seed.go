@@ -174,9 +174,19 @@ func (l Lesson) validate() error {
 		}
 	}
 
+	// Exercises are stored keyed on (chapter, kind, prompt) and passages on
+	// (chapter, korean); a duplicate would overwrite its twin on load rather
+	// than appear twice, so it is rejected here where the file is visible.
+	seenExercise := make(map[string]int, len(l.Exercises))
 	for i, e := range l.Exercises {
 		if e.Kind != KindFillBlank && e.Kind != KindMatching {
 			bad("exercises[%d]: unknown kind %q", i, e.Kind)
+		}
+		key := e.Kind + "\x00" + e.Prompt
+		if prev, dup := seenExercise[key]; dup {
+			bad("exercises[%d]: same kind and prompt as exercises[%d]", i, prev)
+		} else {
+			seenExercise[key] = i
 		}
 		if strings.TrimSpace(e.Prompt) == "" {
 			bad("exercises[%d]: prompt is empty", i)
@@ -189,9 +199,14 @@ func (l Lesson) validate() error {
 		}
 	}
 
+	seenPassage := make(map[string]int, len(l.Passages))
 	for i, p := range l.Passages {
 		if strings.TrimSpace(p.Korean) == "" {
 			bad("passages[%d]: korean is empty", i)
+		} else if prev, dup := seenPassage[p.Korean]; dup {
+			bad("passages[%d]: same korean text as passages[%d]", i, prev)
+		} else {
+			seenPassage[p.Korean] = i
 		}
 		if len(p.Questions) == 0 {
 			bad("passages[%d]: needs at least one question", i)
