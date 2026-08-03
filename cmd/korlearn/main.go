@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -28,8 +29,10 @@ func main() {
 	flag.StringVar(&cfg.ttsCache, "tts-cache", "cache/tts", "directory for synthesized audio")
 	flag.StringVar(&cfg.ttsURL, "tts-url", "http://localhost:8123", "base URL of the Python TTS sidecar")
 	flag.StringVar(&cfg.ttsVoice, "tts-voice", "", "sidecar voice (empty uses the sidecar default)")
+	prewarm := flag.Bool("prewarm", false, "synthesize every vocab word into the audio cache, then exit")
 	flag.Parse()
 
+	cfg.prewarm = *prewarm
 	if err := run(cfg); err != nil {
 		log.Fatal(err)
 	}
@@ -42,6 +45,7 @@ type config struct {
 	ttsCache    string
 	ttsURL      string
 	ttsVoice    string
+	prewarm     bool
 }
 
 func run(cfg config) error {
@@ -61,9 +65,49 @@ func run(cfg config) error {
 	// audio request, so it can be started, stopped, or missing independently.
 	audio := tts.New(cfg.ttsCache, cfg.ttsURL, cfg.ttsVoice)
 
+	if cfg.prewarm {
+		return prewarmAudio(context.Background(), db, audio)
+	}
+
 	srv := api.New(db, audio)
 	log.Printf("listening on http://%s", cfg.addr)
 	return http.ListenAndServe(cfg.addr, srv.Routes())
+}
+
+// prewarmAudio synthesizes every vocab word up front so that no card in a study
+// session ever waits on the model. Cached words are skipped by the cache
+// itself, which makes reruns cheap after adding a lesson.
+//
+// Failures are counted and reported rather than fatal: one word the sidecar
+// chokes on should not abandon the other several hundred.
+func prewarmAudio(ctx context.Context, db *store.DB, audio *tts.Cache) error {
+	chapters, err := db.Chapters(ctx)
+	if err != nil {
+		return err
+	}
+
+	var done, failed int
+	for _, c := range chapters {
+		vocab, err := db.ChapterVocab(ctx, c.ID)
+		if err != nil {
+			return err
+		}
+		for _, v := range vocab {
+			if _, err := audio.Path(ctx, v.Korean); err != nil {
+				log.Printf("  %s: %v", v.Korean, err)
+				failed++
+				continue
+			}
+			done++
+		}
+		log.Printf("chapter %d (%s): %d words", c.Position, c.Title, len(vocab))
+	}
+
+	log.Printf("prewarm complete: %d synthesized or cached, %d failed", done, failed)
+	if failed > 0 {
+		return fmt.Errorf("%d words could not be synthesized", failed)
+	}
+	return nil
 }
 
 // loadContent parses and loads every lesson file, returning how many it found.
