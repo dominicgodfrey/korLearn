@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "book": "Fixture Book",
+  "lesson": 1,
+  "position": 7,
+  "title": "Fixture A",
+  "vocab": [{ "korean": "가", "english": ["a"], "pos": "noun", "irregular": null }]
+}

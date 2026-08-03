@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "book": "Fixture Book",
+  "lesson": 1,
+  "position": 1,
+  "title": "Fixture lesson one",
+  "vocab": [
+    {
+      "korean": "하나",
+      "english": ["one"],
+      "pos": "noun",
+      "speechLevel": "",
+      "irregular": null,
+      "notes": ""
+    },
+    {
+      "korean": "둘",
+      "english": ["two", "a pair"],
+      "pos": "noun",
+      "irregular": null
+    }
+  ]
+}

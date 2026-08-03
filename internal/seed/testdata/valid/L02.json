@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "book": "Fixture Book",
+  "lesson": 2,
+  "position": 2,
+  "title": "Fixture lesson two",
+  "allowExtra": ["은", "는"],
+  "vocab": [
+    {
+      "korean": "셋",
+      "english": ["three"],
+      "pos": "noun",
+      "speechLevel": "polite",
+      "irregular": "ㅂ",
+      "notes": "fixture note"
+    }
+  ],
+  "grammarPoints": [
+    {
+      "id": "fx-topic",
+      "title": "Fixture topic marker",
+      "explanation": "Placeholder explanation for parser tests."
+    }
+  ],
+  "exercises": [
+    {
+      "kind": "fill_blank",
+      "grammarPoint": "fx-topic",
+      "prompt": "___",
+      "answer": ["는", "은"]
+    },
+    {
+      "kind": "matching",
+      "prompt": "Match the fixtures.",
+      "answer": ["셋"],
+      "payload": { "pairs": [["셋", "three"]] }
+    }
+  ],
+  "passages": [
+    {
+      "korean": "고양이",
+      "questions": [{ "q": "Fixture question?", "reference": "고양이" }]
+    }
+  ]
+}
