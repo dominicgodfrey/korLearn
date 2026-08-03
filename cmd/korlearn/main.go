@@ -43,6 +43,7 @@ func main() {
 	flag.StringVar(&cfg.ttsCache, "tts-cache", "cache/tts", "directory for synthesized audio")
 	flag.StringVar(&cfg.ttsURL, "tts-url", "http://localhost:8123", "base URL of the Python TTS sidecar")
 	flag.StringVar(&cfg.ttsVoice, "tts-voice", "", "sidecar voice (empty uses the sidecar default)")
+	flag.StringVar(&cfg.webDir, "web", "web/dist", "directory of built frontend assets")
 	prewarm := flag.Bool("prewarm", false, "synthesize every vocab word into the audio cache, then exit")
 	flag.Parse()
 
@@ -59,6 +60,7 @@ type config struct {
 	ttsCache    string
 	ttsURL      string
 	ttsVoice    string
+	webDir      string
 	prewarm     bool
 }
 
@@ -83,9 +85,13 @@ func run(cfg config) error {
 		return prewarmAudio(context.Background(), db, audio)
 	}
 
-	srv := api.New(db, audio)
+	mux := api.New(db, audio).Routes()
+	// Registered last and at the root, so every /api pattern above wins by
+	// specificity and only unmatched paths reach the frontend.
+	mux.Handle("/", api.StaticHandler(cfg.webDir))
+
 	log.Printf("listening on http://%s", cfg.addr)
-	return http.ListenAndServe(cfg.addr, srv.Routes())
+	return http.ListenAndServe(cfg.addr, mux)
 }
 
 // runLint reports vocabulary used before it is taught.
