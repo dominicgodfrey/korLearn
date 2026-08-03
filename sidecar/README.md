@@ -39,11 +39,37 @@ to build from source.
 uv venv sidecar/.venv --python 3.11
 uv pip install --python sidecar/.venv/Scripts/python.exe torch --index-url https://download.pytorch.org/whl/cu128
 uv pip install --python sidecar/.venv/Scripts/python.exe "git+https://github.com/myshell-ai/MeloTTS.git"
+uv pip install --python sidecar/.venv/Scripts/python.exe mecab-ko mecab-ko-dic
 sidecar/.venv/Scripts/python.exe -m unidic download
 ```
 
 The CUDA index is `cu128` because the RTX 5060 Ti is Blackwell (sm_120); older
 CUDA wheels will not run on it.
+
+`unidic` is a 526MB Japanese dictionary that MeloTTS loads unconditionally, even
+for Korean. It is not optional.
+
+## Two Windows traps, already handled
+
+**`eunjeon.py`** — g2pkk picks its morphological analyzer by platform:
+`python-mecab-ko` on Unix, `eunjeon` on Windows. `eunjeon` has no wheels and
+needs a full MSVC C++ toolchain to build. `mecab-ko` ships prebuilt Windows
+wheels of the same MeCab but exposes only the raw SWIG `Tagger`, not the `.pos()`
+method g2pkk calls, so `eunjeon.py` here bridges the two. It sits next to
+`server.py` so that directory lands on `sys.path`, which is what makes g2pkk's
+`find_spec("eunjeon")` succeed.
+
+Without it, g2pkk still runs but silently skips its POS-dependent rules: the
+의 particle (나의 → 나에), ㄹ-ending tensification, and nasal-stem tensification
+(안다 → 안따). Common enough in beginner Korean to teach the wrong pronunciation,
+which is why it is worth the shim.
+
+**`os.chdir` at startup** — NLTK refuses to import any module whose file lives
+under the current working directory. The venv sits at `sidecar/.venv`, inside the
+repo, so running the server from the repo root makes every one of NLTK's own
+dependencies look like a working-directory import and synthesis fails with a
+confusing security error. `server.py` moves off the repo before importing
+anything that pulls in NLTK. Nothing in it resolves paths relatively.
 
 ## Running
 

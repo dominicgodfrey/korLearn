@@ -19,8 +19,24 @@ import argparse
 import io
 import json
 import logging
+import os
+import sys
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# This directory holds eunjeon.py, the Windows shim g2pkk imports by name.
+# Inserted explicitly rather than relying on sys.path[0] so the server still
+# works under PYTHONSAFEPATH or when imported rather than run.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# NLTK refuses to import any module whose file lives under the current working
+# directory. The venv sits inside the repo at sidecar/.venv, so running this
+# from the repo root makes every one of NLTK's own dependencies look like a
+# working-directory import and synthesis fails with a confusing security error.
+# Moving off the repo before importing anything that pulls in NLTK sidesteps it
+# for good; nothing here resolves paths relatively.
+os.chdir(tempfile.gettempdir())
 
 import soundfile as sf
 
