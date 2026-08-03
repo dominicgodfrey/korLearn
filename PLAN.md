@@ -25,7 +25,7 @@ and see honest long-term progress.
 | Review | User always picks what to study. Weakness scoring feeds a dashboard + an on-demand "trouble spots" playlist — never silently reorders a session |
 | Free-text grading | LLM returns structured rubric JSON + corrected sentence. Feedback in English, corrections in Korean. Manual override retained |
 | Grades | Per chapter: **average score across sessions over time** + **best score ever** |
-| TTS | `GET /api/tts` with disk cache, Kokoro sidecar |
+| TTS | `GET /api/tts` with disk cache, MeloTTS sidecar (**not** Kokoro — see below) |
 | STT | faster-whisper, push-to-talk turns, feedback after each turn |
 | LLM | `exaone3.5:7.8b` (bilingual EN/KO, LG AI Research) via Ollama, behind a golden eval set |
 | Frontend | Greenfield React + TS; riplet read as reference only |
@@ -33,13 +33,36 @@ and see honest long-term progress.
 ## Environment facts (verified on this machine)
 
 - **RTX 5060 Ti, 16GB VRAM**; Ryzen 7 7700X; 31GB RAM. Enough to hold EXAONE (~5GB Q4) +
-  Kokoro (~2GB) + Whisper (~1–3GB) resident at once — Phase 3 won't thrash.
-- Ollama 0.30.10 installed (`qwen3:8b`, `qwen2.5vl:7b` present). `exaone3.5:7.8b` needs pulling.
-- **Go is not installed** — first setup step.
-- **Only Python 3.14 is installed.** torch / kokoro / faster-whisper do not ship 3.14 wheels.
-  The sidecar needs its own **Python 3.11 or 3.12 venv**. Do not fight 3.14.
+  MeloTTS (~1GB) + Whisper (~1–3GB) resident at once — Phase 3 won't thrash.
+  The 5060 Ti is **Blackwell (sm_120)**: torch must come from the **cu128** index or newer.
+  Verified working: `torch 2.11.0+cu128`, `torch.cuda.is_available() == True`.
+- Ollama 0.30.10 installed (`qwen2.5vl:7b` present; `qwen3:8b` is gone).
+  `exaone3.5:7.8b` still needs pulling — not required before Phase 2.
+- **Go 1.26.5 installed** (2026-08-03, `winget install GoLang.Go`).
+- Node v24.16.0 is installed, so Vite needs no extra setup.
+- The sidecar venv must be **Python 3.11**, not 3.12: MeloTTS pins
+  `transformers==4.27.4`, whose `tokenizers` has no wheel past 3.11 and needs Rust to
+  build from source. `uv` fetches 3.11 on demand. Still do not fight 3.14.
 - **ffmpeg is not installed** — faster-whisper needs it unless the browser records WAV directly.
-- Piper was ruled out: **no Korean voice exists** for it. Kokoro supports Korean natively.
+- **C: is at 93% (66GB free)** — relevant when stacking CUDA wheels and models.
+
+### TTS engine — corrected 2026-08-03
+
+**Kokoro has no Korean voices.** Verified against the model repo: 54 voices across nine
+languages (`af am bf bm ef em ff hf hm if im jf jm pf pm zf zm`), none Korean, and no Korean
+code in `KPipeline.LANG_CODES`. Its frontend library `misaki` *does* ship Korean G2P
+(`misaki.ko` imports fine), which is the likely source of the original mistake — but the
+model was never trained on Korean. Piper remains ruled out for the same reason it always was.
+
+`facebook/mms-tts-kor` was measured as a fallback and works (0.11s per word on the 5060 Ti),
+but it synthesizes from **uroman romanization** rather than Hangul, at 16kHz. Korean
+phonology is therefore never applied, which is the wrong trade for an app about pronunciation.
+
+**MeloTTS** is the engine: a real Korean frontend (`g2pkk`) that resolves 받침 and consonant
+assimilation (학생 → hakssaeng, 종로 → jongno), MIT licensed, 44.1kHz, runs locally.
+
+The Go side is engine-agnostic — it speaks `POST /synth` to a sidecar and caches the wav —
+so replacing the engine again costs one Python file.
 
 ## Architecture
 
