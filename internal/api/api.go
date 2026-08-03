@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dominicgodfrey/korLearn/internal/stats"
 	"github.com/dominicgodfrey/korLearn/internal/store"
 	"github.com/dominicgodfrey/korLearn/internal/tts"
 )
@@ -20,10 +21,11 @@ type Server struct {
 	// audio may be nil, in which case the tts endpoint reports 503 rather than
 	// the binary refusing to start without a sidecar running.
 	audio *tts.Cache
+	stats *stats.Stats
 }
 
 func New(db *store.DB, audio *tts.Cache) *Server {
-	return &Server{db: db, audio: audio}
+	return &Server{db: db, audio: audio, stats: stats.New(db)}
 }
 
 // Routes returns the mux. Patterns use the method-and-wildcard syntax added in
@@ -37,6 +39,11 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/sessions/{id}/end", s.endSession)
 	mux.HandleFunc("POST /api/attempts", s.createAttempt)
 	mux.HandleFunc("GET /api/tts", s.speak)
+	mux.HandleFunc("GET /api/stats/chapters", s.chapterGrades)
+	mux.HandleFunc("GET /api/stats/weak", s.weakItems)
+	mux.HandleFunc("GET /api/stats/grammar", s.weakGrammar)
+	mux.HandleFunc("GET /api/stats/calendar", s.calendar)
+	mux.HandleFunc("GET /api/chapters/{id}/trend", s.chapterTrend)
 	return mux
 }
 
