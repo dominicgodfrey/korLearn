@@ -29,6 +29,9 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/chapters", s.listChapters)
 	mux.HandleFunc("GET /api/chapters/{id}/vocab", s.chapterVocab)
+	mux.HandleFunc("POST /api/sessions", s.createSession)
+	mux.HandleFunc("POST /api/sessions/{id}/end", s.endSession)
+	mux.HandleFunc("POST /api/attempts", s.createAttempt)
 	return mux
 }
 
