@@ -126,6 +126,65 @@ func (db *DB) RecordAttempt(ctx context.Context, a Attempt) (int64, error) {
 	return res.LastInsertId()
 }
 
+// SaveSnapshot overwrites the client's session state, so reloading the page
+// resumes at the same card.
+//
+// The snapshot is opaque JSON owned entirely by the frontend reducer. The
+// server deliberately does not interpret it: session flow is the client's
+// business, and parsing it here would mean two implementations of the same
+// state machine that could disagree.
+//
+// Snapshots are refused for ended sessions. There is nothing left to resume,
+// and accepting one would leave state behind that EndSession already cleared.
+func (db *DB) SaveSnapshot(ctx context.Context, sessionID int64, snapshot string) error {
+	var ended *string
+	switch err := db.QueryRowContext(ctx,
+		`SELECT ended_at FROM sessions WHERE id = ?`, sessionID).Scan(&ended); {
+	case errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("session %d: %w", sessionID, ErrNotFound)
+	case err != nil:
+		return err
+	case ended != nil:
+		return fmt.Errorf("session %d: %w", sessionID, ErrSessionClosed)
+	}
+
+	_, err := db.ExecContext(ctx,
+		`UPDATE sessions SET snapshot_json = ? WHERE id = ?`, snapshot, sessionID)
+	if err != nil {
+		return fmt.Errorf("save snapshot: %w", err)
+	}
+	return nil
+}
+
+// Snapshot returns the stored client state for a session, or "" if there is
+// none — an open session that has not saved yet, or one already ended.
+func (db *DB) Snapshot(ctx context.Context, sessionID int64) (string, error) {
+	var snapshot *string
+	switch err := db.QueryRowContext(ctx,
+		`SELECT snapshot_json FROM sessions WHERE id = ?`, sessionID).Scan(&snapshot); {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", fmt.Errorf("session %d: %w", sessionID, ErrNotFound)
+	case err != nil:
+		return "", err
+	}
+	if snapshot == nil {
+		return "", nil
+	}
+	return *snapshot, nil
+}
+
+// OpenSession reports the most recently started session that has not ended, so
+// the app can offer to resume on startup. Returns 0 when there is none.
+func (db *DB) OpenSession(ctx context.Context) (int64, error) {
+	var id int64
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC, id DESC LIMIT 1`).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return id, err
+}
+
 // sessionScoreSQL is the single definition of what a score means, so no other
 // query can drift from it.
 //
