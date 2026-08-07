@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/dominicgodfrey/korLearn/internal/store"
 )
@@ -21,8 +22,9 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.Mode == "" {
-		writeError(w, http.StatusBadRequest, "mode is required", nil)
+	if !store.ValidMode(req.Mode) {
+		writeError(w, http.StatusBadRequest,
+			"mode must be one of "+strings.Join(store.StudyModes, ", ")+", or "+store.ModeReview, nil)
 		return
 	}
 

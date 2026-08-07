@@ -162,7 +162,7 @@ func TestRemovedContentIsRetiredNotDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := db.Exec(`INSERT INTO sessions (mode) VALUES ('flashcards')`)
+	res, err := db.Exec(`INSERT INTO sessions (mode) VALUES ('vocab_flip')`)
 	if err != nil {
 		t.Fatal(err)
 	}

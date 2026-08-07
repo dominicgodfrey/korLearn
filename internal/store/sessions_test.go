@@ -56,7 +56,7 @@ func TestScoreUsesFirstAttemptPerItem(t *testing.T) {
 	ctx := context.Background()
 	chapterID, ids := fixture(t, db, "하나", "둘")
 
-	sessionID, err := db.CreateSession(ctx, &chapterID, "flashcards")
+	sessionID, err := db.CreateSession(ctx, &chapterID, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestScoreUsesOverriddenVerdict(t *testing.T) {
 	ctx := context.Background()
 	chapterID, ids := fixture(t, db, "하나")
 
-	sessionID, err := db.CreateSession(ctx, &chapterID, "flashcards")
+	sessionID, err := db.CreateSession(ctx, &chapterID, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestScoreIsNullWithoutAttempts(t *testing.T) {
 	ctx := context.Background()
 	chapterID, _ := fixture(t, db, "하나")
 
-	sessionID, err := db.CreateSession(ctx, &chapterID, "flashcards")
+	sessionID, err := db.CreateSession(ctx, &chapterID, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestEndSessionTwiceIsRefused(t *testing.T) {
 	ctx := context.Background()
 	chapterID, _ := fixture(t, db, "하나")
 
-	sessionID, err := db.CreateSession(ctx, &chapterID, "flashcards")
+	sessionID, err := db.CreateSession(ctx, &chapterID, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestAttemptAfterEndIsRefused(t *testing.T) {
 	ctx := context.Background()
 	chapterID, ids := fixture(t, db, "하나")
 
-	sessionID, err := db.CreateSession(ctx, &chapterID, "flashcards")
+	sessionID, err := db.CreateSession(ctx, &chapterID, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestAttemptRejectsUnknownReferences(t *testing.T) {
 	ctx := context.Background()
 	chapterID, ids := fixture(t, db, "하나")
 
-	sessionID, err := db.CreateSession(ctx, &chapterID, "flashcards")
+	sessionID, err := db.CreateSession(ctx, &chapterID, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestAttemptRejectsUnknownReferences(t *testing.T) {
 // Comprehensive quizzes span the curriculum and belong to no chapter.
 func TestCreateSessionWithoutChapter(t *testing.T) {
 	db := open(t)
-	if _, err := db.CreateSession(context.Background(), nil, "comprehensive"); err != nil {
+	if _, err := db.CreateSession(context.Background(), nil, "review"); err != nil {
 		t.Errorf("CreateSession(nil): %v", err)
 	}
 }
@@ -211,7 +211,93 @@ func TestCreateSessionWithoutChapter(t *testing.T) {
 func TestCreateSessionUnknownChapter(t *testing.T) {
 	db := open(t)
 	missing := int64(9999)
-	if _, err := db.CreateSession(context.Background(), &missing, "flashcards"); !errors.Is(err, ErrNotFound) {
+	if _, err := db.CreateSession(context.Background(), &missing, "vocab_flip"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("CreateSession returned %v, want ErrNotFound", err)
+	}
+}
+
+// A session mode outside the known set would run, score, and then never count
+// as progress for anything — refuse it at the door instead.
+func TestCreateSessionRejectsUnknownMode(t *testing.T) {
+	db := open(t)
+	ctx := context.Background()
+	if err := db.LoadLessons(ctx, []seed.Lesson{lesson(1, "하나")}); err != nil {
+		t.Fatal(err)
+	}
+	var chapterID int64
+	if err := db.QueryRow(`SELECT id FROM chapters`).Scan(&chapterID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.CreateSession(ctx, &chapterID, "flashcards"); err == nil {
+		t.Error("CreateSession accepted an unknown mode")
+	}
+	for _, mode := range StudyModes {
+		if _, err := db.CreateSession(ctx, &chapterID, mode); err != nil {
+			t.Errorf("CreateSession(%q): %v", mode, err)
+		}
+	}
+}
+
+// The chapter page draws one tile per module whether or not it has ever been
+// run, so progress must report every module rather than only the visited ones.
+func TestChapterProgressCoversEveryModule(t *testing.T) {
+	db := open(t)
+	ctx := context.Background()
+	if err := db.LoadLessons(ctx, []seed.Lesson{lesson(1, "하나")}); err != nil {
+		t.Fatal(err)
+	}
+	var chapterID, vocabID int64
+	if err := db.QueryRow(`SELECT id FROM chapters`).Scan(&chapterID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT id FROM vocab`).Scan(&vocabID); err != nil {
+		t.Fatal(err)
+	}
+
+	// One finished flashcard session with a perfect score.
+	id, err := db.CreateSession(ctx, &chapterID, ModeVocabFlip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.RecordAttempt(ctx, Attempt{
+		SessionID: id, ItemType: ItemVocab, ItemID: vocabID,
+		Stage: StageFlip, Correct: true, OriginalCorrect: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.EndSession(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+
+	// An open session must not count: progress means finished.
+	if _, err := db.CreateSession(ctx, &chapterID, ModeGrammar); err != nil {
+		t.Fatal(err)
+	}
+
+	progress, err := db.ChapterProgress(ctx, chapterID)
+	if err != nil {
+		t.Fatalf("ChapterProgress: %v", err)
+	}
+	if len(progress) != len(StudyModes) {
+		t.Fatalf("got %d modules, want %d: %+v", len(progress), len(StudyModes), progress)
+	}
+	for i, p := range progress {
+		if p.Mode != StudyModes[i] {
+			t.Errorf("progress[%d].Mode = %q, want %q", i, p.Mode, StudyModes[i])
+		}
+		switch p.Mode {
+		case ModeVocabFlip:
+			if p.Sessions != 1 || p.LastEndedAt == nil {
+				t.Errorf("%s: %+v, want one finished session", p.Mode, p)
+			}
+			if p.BestScore == nil || *p.BestScore != 1 {
+				t.Errorf("%s: bestScore = %v, want 1", p.Mode, p.BestScore)
+			}
+		default:
+			if p.Sessions != 0 || p.LastEndedAt != nil || p.BestScore != nil {
+				t.Errorf("%s: %+v, want untouched", p.Mode, p)
+			}
+		}
 	}
 }

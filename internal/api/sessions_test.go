@@ -41,7 +41,7 @@ func TestSessionFlow(t *testing.T) {
 	var created struct {
 		ID int64 `json:"id"`
 	}
-	if code := post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"flashcards"}`, &created); code != http.StatusCreated {
+	if code := post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"vocab_flip"}`, &created); code != http.StatusCreated {
 		t.Fatalf("create session status = %d, want 201", code)
 	}
 
@@ -82,7 +82,7 @@ func TestAttemptValidation(t *testing.T) {
 	var created struct {
 		ID int64 `json:"id"`
 	}
-	post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"flashcards"}`, &created)
+	post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"vocab_flip"}`, &created)
 	id := strconv.FormatInt(created.ID, 10)
 
 	tests := []struct {
@@ -114,11 +114,11 @@ func TestCreateSessionValidation(t *testing.T) {
 	if code := post(t, srv, "/api/sessions", `{"chapterId":1}`, nil); code != http.StatusBadRequest {
 		t.Errorf("missing mode status = %d, want 400", code)
 	}
-	if code := post(t, srv, "/api/sessions", `{"chapterId":9999,"mode":"flashcards"}`, nil); code != http.StatusNotFound {
+	if code := post(t, srv, "/api/sessions", `{"chapterId":9999,"mode":"vocab_flip"}`, nil); code != http.StatusNotFound {
 		t.Errorf("unknown chapter status = %d, want 404", code)
 	}
 	// Comprehensive quizzes belong to no chapter.
-	if code := post(t, srv, "/api/sessions", `{"chapterId":null,"mode":"comprehensive"}`, nil); code != http.StatusCreated {
+	if code := post(t, srv, "/api/sessions", `{"chapterId":null,"mode":"review"}`, nil); code != http.StatusCreated {
 		t.Errorf("null chapter status = %d, want 201", code)
 	}
 }
@@ -127,5 +127,17 @@ func TestEndUnknownSession(t *testing.T) {
 	srv, _ := newTestServer(t)
 	if code := post(t, srv, "/api/sessions/9999/end", "", nil); code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", code)
+	}
+}
+
+// Mode is validated at the edge so a typo fails loudly at session start rather
+// than silently producing a session no chapter page will ever count.
+func TestCreateSessionRejectsUnknownMode(t *testing.T) {
+	srv, _ := newTestServer(t)
+	if code := post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"flashcards"}`, nil); code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", code)
+	}
+	if code := post(t, srv, "/api/sessions", `{"chapterId":1,"mode":""}`, nil); code != http.StatusBadRequest {
+		t.Errorf("empty mode: status = %d, want 400", code)
 	}
 }

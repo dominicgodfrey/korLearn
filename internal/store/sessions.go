@@ -45,9 +45,48 @@ func ValidStage(s string) bool {
 	return s == StageFlip || s == StageMC || s == StageTyped
 }
 
+// Study modes: one per module of the chapter flow, plus the cross-chapter
+// review that belongs to no chapter.
+//
+// These are checked rather than accepted as free text because the chapter page
+// derives progress by grouping sessions on this column. A typo would create a
+// session that runs, scores, and then never counts as anything — the quietest
+// possible bug.
+const (
+	ModeVocabFlip     = "vocab_flip"
+	ModeVocabLearn    = "vocab_learn"
+	ModeGrammar       = "grammar"
+	ModeComprehension = "comprehension"
+	ModeConversation  = "conversation"
+	// ModeReview is the comprehensive cross-chapter quiz, the one mode that
+	// runs with a null chapter_id.
+	ModeReview = "review"
+)
+
+// StudyModes lists the chapter modules in the order the guided flow chains
+// them. ModeReview is absent: it is not part of a chapter.
+var StudyModes = []string{
+	ModeVocabFlip, ModeVocabLearn, ModeGrammar, ModeComprehension, ModeConversation,
+}
+
+func ValidMode(m string) bool {
+	if m == ModeReview {
+		return true
+	}
+	for _, s := range StudyModes {
+		if m == s {
+			return true
+		}
+	}
+	return false
+}
+
 // CreateSession opens a session. chapterID is nil for comprehensive quizzes
 // that span the whole curriculum.
 func (db *DB) CreateSession(ctx context.Context, chapterID *int64, mode string) (int64, error) {
+	if !ValidMode(mode) {
+		return 0, fmt.Errorf("mode %q: %w", mode, ErrNotFound)
+	}
 	if chapterID != nil {
 		ok, err := db.ChapterExists(ctx, *chapterID)
 		if err != nil {

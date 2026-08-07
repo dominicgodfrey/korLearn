@@ -35,6 +35,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/chapters", s.listChapters)
+	mux.HandleFunc("GET /api/chapters/{id}", s.chapterDetail)
 	mux.HandleFunc("GET /api/chapters/{id}/vocab", s.chapterVocab)
 	mux.HandleFunc("GET /api/chapters/{id}/lexicon", s.chapterLexicon)
 	mux.HandleFunc("POST /api/sessions", s.createSession)
@@ -90,6 +91,23 @@ func (s *Server) chapterVocab(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, vocab)
+}
+
+// chapterDetail backs the chapter page: the intro it opens with, what each
+// module has to work with, and which modules have been finished.
+func (s *Server) chapterDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "chapter id must be a number", err)
+		return
+	}
+
+	detail, err := s.db.ChapterByID(r.Context(), id)
+	if err != nil {
+		writeStoreError(w, "could not read chapter", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
 }
 
 // chapterLexicon returns everything unlocked at this chapter's position: its

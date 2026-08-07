@@ -106,6 +106,43 @@ func TestChapterVocab(t *testing.T) {
 	}
 }
 
+func TestChapterDetail(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	var chapters []store.Chapter
+	get(t, srv, "/api/chapters", &chapters)
+
+	var detail store.ChapterDetail
+	path := "/api/chapters/" + strconv.FormatInt(chapters[0].ID, 10)
+	if code := get(t, srv, path, &detail); code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", code)
+	}
+
+	if detail.Intro != "Fixture intro." {
+		t.Errorf("intro = %q, want the seeded text", detail.Intro)
+	}
+	if detail.Counts.Vocab != 2 {
+		t.Errorf("counts.vocab = %d, want 2", detail.Counts.Vocab)
+	}
+	// A never-studied chapter still reports every module, so the page can draw
+	// five tiles without inventing the missing ones.
+	if len(detail.Progress) != len(store.StudyModes) {
+		t.Fatalf("progress = %+v, want %d modules", detail.Progress, len(store.StudyModes))
+	}
+	for _, p := range detail.Progress {
+		if p.Sessions != 0 {
+			t.Errorf("%s: %d sessions on a fresh chapter", p.Mode, p.Sessions)
+		}
+	}
+}
+
+func TestChapterDetailNotFound(t *testing.T) {
+	srv, _ := newTestServer(t)
+	if code := get(t, srv, "/api/chapters/9999", nil); code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", code)
+	}
+}
+
 // The lexicon endpoint is the app's one guarantee that a module never shows
 // material from a chapter the user has not reached: it must carry earlier
 // chapters forward and stop dead at the requested one.

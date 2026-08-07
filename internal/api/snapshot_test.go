@@ -32,7 +32,7 @@ func newSession(t *testing.T, srv *httptest.Server) int64 {
 	var created struct {
 		ID int64 `json:"id"`
 	}
-	if code := post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"flashcards"}`, &created); code != http.StatusCreated {
+	if code := post(t, srv, "/api/sessions", `{"chapterId":1,"mode":"vocab_flip"}`, &created); code != http.StatusCreated {
 		t.Fatalf("create session status = %d", code)
 	}
 	return created.ID

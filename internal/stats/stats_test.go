@@ -67,7 +67,7 @@ func newFixture(t *testing.T, words ...string) *fixture {
 func (f *fixture) session(items []int64, results []bool) *float64 {
 	f.t.Helper()
 	ctx := context.Background()
-	id, err := f.db.CreateSession(ctx, &f.chapter, "flashcards")
+	id, err := f.db.CreateSession(ctx, &f.chapter, "vocab_flip")
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestUnfinishedSessionsAreExcluded(t *testing.T) {
 	f.session(f.vocab, []bool{true})
 
 	ctx := context.Background()
-	if _, err := f.db.CreateSession(ctx, &f.chapter, "flashcards"); err != nil {
+	if _, err := f.db.CreateSession(ctx, &f.chapter, "vocab_flip"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -227,7 +227,7 @@ func TestWeakItemsUseFirstAttemptOnly(t *testing.T) {
 	f := newFixture(t, "하나")
 	ctx := context.Background()
 
-	id, err := f.db.CreateSession(ctx, &f.chapter, "flashcards")
+	id, err := f.db.CreateSession(ctx, &f.chapter, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestCalendarCountsEffortButScoresFirstTry(t *testing.T) {
 	f := newFixture(t, "하나")
 	ctx := context.Background()
 
-	id, err := f.db.CreateSession(ctx, &f.chapter, "flashcards")
+	id, err := f.db.CreateSession(ctx, &f.chapter, "vocab_flip")
 	if err != nil {
 		t.Fatal(err)
 	}
