@@ -1,7 +1,6 @@
 package lint
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/dominicgodfrey/korLearn/internal/seed"
@@ -14,6 +13,7 @@ func lesson(position int, words []string, exercisePrompt string) seed.Lesson {
 		LessonNo:      position,
 		Position:      position,
 		Title:         "Fixture",
+		Intro:         "Fixture intro.",
 	}
 	for _, w := range words {
 		l.Vocab = append(l.Vocab, seed.Vocab{Korean: w, English: []string{w}, POS: "noun"})
@@ -24,25 +24,6 @@ func lesson(position int, words []string, exercisePrompt string) seed.Lesson {
 		}
 	}
 	return l
-}
-
-func TestTokens(t *testing.T) {
-	tests := []struct {
-		in   string
-		want []string
-	}{
-		{"저는 학생___.", []string{"저는", "학생"}},
-		{"hello 안녕", []string{"안녕"}},
-		{"3개를 샀어요", []string{"개를", "샀어요"}},
-		{"", nil},
-		{"no hangul at all", nil},
-	}
-	for _, tt := range tests {
-		got := tokens(tt.in)
-		if strings.Join(got, "|") != strings.Join(tt.want, "|") {
-			t.Errorf("tokens(%q) = %v, want %v", tt.in, got, tt.want)
-		}
-	}
 }
 
 // The core case: a word never taught should be flagged.

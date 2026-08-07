@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dominicgodfrey/korLearn/internal/lexicon"
 	"github.com/dominicgodfrey/korLearn/internal/stats"
 	"github.com/dominicgodfrey/korLearn/internal/store"
 	"github.com/dominicgodfrey/korLearn/internal/tts"
@@ -35,6 +36,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/chapters", s.listChapters)
 	mux.HandleFunc("GET /api/chapters/{id}/vocab", s.chapterVocab)
+	mux.HandleFunc("GET /api/chapters/{id}/lexicon", s.chapterLexicon)
 	mux.HandleFunc("POST /api/sessions", s.createSession)
 	mux.HandleFunc("POST /api/sessions/{id}/end", s.endSession)
 	mux.HandleFunc("POST /api/attempts", s.createAttempt)
@@ -88,6 +90,32 @@ func (s *Server) chapterVocab(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, vocab)
+}
+
+// chapterLexicon returns everything unlocked at this chapter's position: its
+// own vocabulary and grammar plus everything from earlier chapters.
+//
+// This is what keeps a module honest. Multiple-choice distractors and matching
+// decoys come from here rather than from the whole vocab table — a distractor
+// from lesson 12 teaches lesson 12 — and it is the word list handed to the LLM
+// for generated drills and conversation.
+func (s *Server) chapterLexicon(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "chapter id must be a number", err)
+		return
+	}
+
+	set, ok, err := lexicon.LoadForChapter(r.Context(), s.db, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read lexicon", err)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "no such chapter", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, set)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

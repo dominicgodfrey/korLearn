@@ -3,9 +3,9 @@
 //
 // This is an authoring aid, not a rule. Korean is agglutinative: 먹었어요 will
 // never substring-match its dictionary form 먹다, so any cheap checker produces
-// false positives. The matcher here is deliberately loose — stem-prefix, with a
-// per-lesson allowExtra escape hatch — and every result is a warning. Nothing
-// in this package fails a build or blocks content.
+// false positives. The matching is deliberately loose — see lexicon.Matcher,
+// which this shares with the LLM output validator — and every result is a
+// warning. Nothing in this package fails a build or blocks content.
 //
 // The honest summary: it catches a word you plainly forgot to teach, and it
 // will also flag inflections it cannot reason about. Treat the output as a
@@ -15,9 +15,8 @@ package lint
 import (
 	"fmt"
 	"sort"
-	"strings"
-	"unicode"
 
+	"github.com/dominicgodfrey/korLearn/internal/lexicon"
 	"github.com/dominicgodfrey/korLearn/internal/seed"
 )
 
@@ -36,137 +35,40 @@ func (f Finding) String() string {
 		f.Book, f.LessonNo, f.Position, f.Where, f.Token)
 }
 
-// hangul reports whether r is Hangul: a composed syllable, or a standalone or
-// conjoining jamo.
-func hangul(r rune) bool {
-	switch {
-	case r >= 0xAC00 && r <= 0xD7A3: // syllables
-		return true
-	case r >= 0x1100 && r <= 0x11FF: // conjoining jamo
-		return true
-	case r >= 0x3130 && r <= 0x318F: // compatibility jamo
-		return true
-	}
-	return false
-}
-
-// tokens splits text into runs of Hangul, discarding everything else. Latin
-// letters, digits, punctuation and the blank markers in fill-in prompts are all
-// irrelevant to a vocabulary check.
-func tokens(text string) []string {
-	var (
-		out     []string
-		current strings.Builder
-	)
-	flush := func() {
-		if current.Len() > 0 {
-			out = append(out, current.String())
-			current.Reset()
-		}
-	}
-	for _, r := range text {
-		switch {
-		case hangul(r):
-			current.WriteRune(r)
-		case unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsSymbol(r) ||
-			unicode.IsDigit(r) || unicode.IsLetter(r):
-			flush()
-		default:
-			flush()
-		}
-	}
-	flush()
-	return out
-}
-
-// lexicon accumulates every form the reader could recognize so far.
-//
-// Two sets, because the safe prefix length differs by source. A verb stem is a
-// legitimate prefix at any length — 먹다 teaches 먹-, which has to cover
-// 먹었어요. A whole taught word is not: one-syllable nouns and particles prefix
-// an enormous share of Korean, so letting 가 license 가족 would silence the
-// check entirely. Stems earn prefix matching; short words only match exactly.
-type lexicon struct {
-	exact    map[string]bool
-	prefixes map[string]bool
-}
-
-func newLexicon() *lexicon {
-	return &lexicon{exact: map[string]bool{}, prefixes: map[string]bool{}}
-}
-
-func (l *lexicon) add(word string) {
-	word = strings.TrimSpace(word)
-	if word == "" {
-		return
-	}
-	l.exact[word] = true
-
-	runes := []rune(word)
-	if len(runes) >= 2 {
-		l.prefixes[word] = true
-	}
-	// Dictionary-form verbs and adjectives also teach their stem.
-	if len(runes) > 1 && runes[len(runes)-1] == '다' {
-		stem := string(runes[:len(runes)-1])
-		l.exact[stem] = true
-		l.prefixes[stem] = true
-	}
-}
-
-// knows reports whether a token plausibly derives from something already taught:
-// an exact match, a taught prefix (an inflection), or a token that is itself a
-// prefix of a taught form (a contraction of something longer).
-func (l *lexicon) knows(token string) bool {
-	if l.exact[token] {
-		return true
-	}
-	for form := range l.prefixes {
-		if strings.HasPrefix(token, form) {
-			return true
-		}
-		if len([]rune(form)) >= 2 && strings.HasPrefix(form, token) {
-			return true
-		}
-	}
-	return false
-}
-
 // Run checks lessons in position order and returns every finding.
 //
 // Lessons must already be sorted by position, which seed.LoadDir guarantees.
 // A lesson's own vocabulary is added before its exercises and passages are
 // checked, so a lesson may freely use the words it teaches.
 func Run(lessons []seed.Lesson) []Finding {
-	lex := newLexicon()
+	m := lexicon.NewMatcher()
 	var findings []Finding
 
 	for _, l := range lessons {
 		for _, v := range l.Vocab {
-			lex.add(v.Korean)
+			m.Add(v.Korean)
 		}
 		for _, extra := range l.AllowExtra {
-			lex.add(extra)
+			m.Add(extra)
 		}
 		// Grammar point titles are explanatory text naming the pattern being
 		// taught, so they are a source of forms rather than a place to check.
 		for _, g := range l.GrammarPoints {
-			for _, tok := range tokens(g.Title) {
-				lex.add(tok)
-			}
+			m.AddText(g.Title)
 		}
 
 		check := func(where, text string) {
-			for _, tok := range tokens(text) {
-				if !lex.knows(tok) {
-					findings = append(findings, Finding{
-						Book: l.Book, LessonNo: l.LessonNo, Position: l.Position,
-						Where: where, Token: tok,
-					})
-				}
+			for _, tok := range m.Unknown(text) {
+				findings = append(findings, Finding{
+					Book: l.Book, LessonNo: l.LessonNo, Position: l.Position,
+					Where: where, Token: tok,
+				})
 			}
 		}
 
+		for i, g := range l.GrammarPoints {
+			check(fmt.Sprintf("grammarPoints[%d].example.korean", i), g.Example.Korean)
+		}
 		for i, e := range l.Exercises {
 			check(fmt.Sprintf("exercises[%d].prompt", i), e.Prompt)
 			for j, a := range e.Answer {

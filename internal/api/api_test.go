@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/dominicgodfrey/korLearn/internal/lexicon"
 	"github.com/dominicgodfrey/korLearn/internal/seed"
 	"github.com/dominicgodfrey/korLearn/internal/store"
 	"github.com/dominicgodfrey/korLearn/internal/tts"
@@ -27,6 +28,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *store.DB) {
 		LessonNo:      1,
 		Position:      1,
 		Title:         "Fixture",
+		Intro:         "Fixture intro.",
 		Vocab: []seed.Vocab{
 			{Korean: "하나", English: []string{"one", "a single"}, POS: "noun"},
 			{Korean: "둘", English: []string{"two"}, POS: "noun", SpeechLevel: "polite"},
@@ -101,6 +103,69 @@ func TestChapterVocab(t *testing.T) {
 	// Hangul must survive the round trip as composed syllables.
 	if vocab[0].Korean != "하나" {
 		t.Errorf("korean = %q", vocab[0].Korean)
+	}
+}
+
+// The lexicon endpoint is the app's one guarantee that a module never shows
+// material from a chapter the user has not reached: it must carry earlier
+// chapters forward and stop dead at the requested one.
+func TestChapterLexicon(t *testing.T) {
+	srv, db := newTestServer(t)
+	ctx := context.Background()
+
+	chapter := func(position int, word string) seed.Lesson {
+		return seed.Lesson{
+			SchemaVersion: seed.SchemaVersion,
+			Book:          "Fixture Book",
+			LessonNo:      position,
+			Position:      position,
+			Title:         "Fixture",
+			Intro:         "Fixture intro.",
+			Vocab:         []seed.Vocab{{Korean: word, English: []string{word}, POS: "noun"}},
+			GrammarPoints: []seed.GrammarPoint{{
+				ID: "fx" + word, Title: "Point " + word,
+				Example: seed.Example{Korean: word, English: "e"},
+			}},
+		}
+	}
+	if err := db.LoadLessons(ctx, []seed.Lesson{
+		chapter(1, "하나"), chapter(2, "둘"), chapter(3, "셋"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var chapters []store.Chapter
+	get(t, srv, "/api/chapters", &chapters)
+	if len(chapters) != 3 {
+		t.Fatalf("got %d chapters, want 3", len(chapters))
+	}
+
+	var set lexicon.Set
+	path := "/api/chapters/" + strconv.FormatInt(chapters[1].ID, 10) + "/lexicon"
+	if code := get(t, srv, path, &set); code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", code)
+	}
+
+	if set.Position != 2 {
+		t.Errorf("position = %d, want 2", set.Position)
+	}
+	for _, w := range set.Words {
+		if w.Korean == "셋" {
+			t.Error("a word from chapter 3 is unlocked at chapter 2")
+		}
+	}
+	if len(set.Words) != 2 {
+		t.Errorf("words = %+v, want 하나 and 둘", set.Words)
+	}
+	if len(set.Grammar) != 2 {
+		t.Errorf("grammar = %+v, want 2 points", set.Grammar)
+	}
+}
+
+func TestChapterLexiconNotFound(t *testing.T) {
+	srv, _ := newTestServer(t)
+	if code := get(t, srv, "/api/chapters/9999/lexicon", nil); code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", code)
 	}
 }
 
