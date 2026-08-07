@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "book": "Fixture Book",
+  "lesson": 1,
+  "position": 1,
+  "title": "Fixture 1 — Greetings",
+  "intro": "Placeholder chapter. Real intros go here: two or three sentences of English naming what the chapter covers and what you should be able to do once you finish it. This one exists so the chapter page has something to render before any lesson is authored.",
+  "allowExtra": ["은", "는", "이에요", "예요", "저는", "무엇", "민수", "말해요"],
+  "vocab": [
+    { "korean": "안녕하세요", "english": ["hello"], "pos": "expression", "speechLevel": "polite", "irregular": null, "notes": "Fixture entry." },
+    { "korean": "학생", "english": ["student"], "pos": "noun", "irregular": null },
+    { "korean": "선생님", "english": ["teacher"], "pos": "noun", "speechLevel": "deferential", "irregular": null },
+    { "korean": "이름", "english": ["name"], "pos": "noun", "irregular": null },
+    { "korean": "감사합니다", "english": ["thank you"], "pos": "expression", "speechLevel": "deferential", "irregular": null }
+  ],
+  "grammarPoints": [
+    {
+      "id": "f1-copula",
+      "title": "N이에요/예요",
+      "explanation": "Placeholder explanation. The grammar module shows this text, then the one example below, then starts drilling.",
+      "example": { "korean": "저는 학생이에요.", "english": "I am a student." }
+    },
+    {
+      "id": "f1-topic",
+      "title": "N은/는",
+      "explanation": "Placeholder explanation for the topic marker.",
+      "example": { "korean": "이름은 무엇이에요?", "english": "What is your name?" }
+    }
+  ],
+  "exercises": [
+    { "kind": "fill_blank", "grammarPoint": "f1-copula", "prompt": "저는 학생___.", "answer": ["이에요"] },
+    { "kind": "fill_blank", "grammarPoint": "f1-topic", "prompt": "이름___ 무엇이에요?", "answer": ["은"] },
+    {
+      "kind": "matching",
+      "grammarPoint": "f1-copula",
+      "prompt": "Match each word to its meaning.",
+      "answer": ["학생"],
+      "payload": { "pairs": [["학생", "student"], ["선생님", "teacher"], ["이름", "name"]] }
+    }
+  ],
+  "passages": [
+    {
+      "korean": "안녕하세요. 저는 학생이에요. 이름은 민수예요. 선생님, 감사합니다.",
+      "questions": [
+        { "q": "학생이에요, 선생님이에요?", "reference": "학생이에요.", "grammarPoints": ["f1-copula"] },
+        { "q": "이름은 무엇이에요?", "reference": "이름은 민수예요.", "grammarPoints": ["f1-topic"] },
+        { "q": "선생님에게 무엇을 말해요?", "reference": "감사합니다. 안녕하세요.", "grammarPoints": ["f1-copula"] }
+      ]
+    }
+  ]
+}

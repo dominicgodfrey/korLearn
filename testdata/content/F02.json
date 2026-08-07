@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "book": "Fixture Book",
+  "lesson": 2,
+  "position": 2,
+  "title": "Fixture 2 — School",
+  "intro": "Second placeholder chapter. Exists mainly so the chapter list has more than one row and so the lexicon endpoint has an earlier chapter to carry forward.",
+  "allowExtra": ["에", "에서", "이", "가", "을", "를", "책을", "어디", "무엇", "해요"],
+  "vocab": [
+    { "korean": "학교", "english": ["school"], "pos": "noun", "irregular": null },
+    { "korean": "교실", "english": ["classroom"], "pos": "noun", "irregular": null },
+    { "korean": "책", "english": ["book"], "pos": "noun", "irregular": null },
+    { "korean": "가다", "english": ["to go"], "pos": "verb", "irregular": null },
+    { "korean": "읽다", "english": ["to read"], "pos": "verb", "irregular": null }
+  ],
+  "grammarPoints": [
+    {
+      "id": "f2-location",
+      "title": "N에 가다",
+      "explanation": "Placeholder explanation for the destination particle.",
+      "example": { "korean": "학교에 가요.", "english": "I go to school." }
+    }
+  ],
+  "exercises": [
+    { "kind": "fill_blank", "grammarPoint": "f2-location", "prompt": "학교___ 가요.", "answer": ["에"] },
+    {
+      "kind": "matching",
+      "prompt": "Match each place to its meaning.",
+      "answer": ["학교"],
+      "payload": { "pairs": [["학교", "school"], ["교실", "classroom"], ["책", "book"]] }
+    }
+  ],
+  "passages": [
+    {
+      "korean": "학생이 학교에 가요. 교실에서 책을 읽어요.",
+      "questions": [
+        { "q": "학생이 어디에 가요?", "reference": "학교에 가요.", "grammarPoints": ["f2-location"] },
+        { "q": "교실에서 무엇을 해요?", "reference": "책을 읽어요." }
+      ]
+    }
+  ]
+}
