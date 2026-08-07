@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Korean and Latin sit side by side everywhere in this app, so the Hangul
+   stack is declared once here rather than per component. Without it Windows
+   falls back to Malgun Gothic at a visibly different weight than the Latin
+   text beside it. */
+@theme {
+  --font-sans: "Segoe UI", system-ui, sans-serif;
+  --font-korean: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+html {
+  color-scheme: light dark;
+}

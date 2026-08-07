@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "korlearn-fixtures",
+      "runtimeExecutable": "go",
+      "runtimeArgs": [
+        "run",
+        "./cmd/korlearn",
+        "-content",
+        "testdata/content",
+        "-db",
+        "fixture.db",
+        "-web",
+        "web/dist",
+        "-addr",
+        "localhost:8099"
+      ],
+      "port": 8099,
+      "autoPort": false
+    }
+  ]
+}
