@@ -25,6 +25,7 @@ func lesson(position int, words ...string) seed.Lesson {
 		LessonNo:      position,
 		Position:      position,
 		Title:         "Fixture",
+		Intro:         "Fixture intro.",
 	}
 	for _, w := range words {
 		l.Vocab = append(l.Vocab, seed.Vocab{Korean: w, English: []string{w}, POS: "noun"})
@@ -34,15 +35,27 @@ func lesson(position int, words ...string) seed.Lesson {
 
 func TestMigrateIsIdempotent(t *testing.T) {
 	db := open(t)
+
+	count := func() int {
+		var n int
+		if err := db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	// The count itself is not asserted: a fixed number here would have to be
+	// bumped by every migration, which makes it a chore rather than a check.
+	// What matters is that running migrate again applies nothing.
+	before := count()
+	if before == 0 {
+		t.Fatal("no migrations applied on open")
+	}
 	if err := db.migrate(); err != nil {
 		t.Fatalf("second migrate: %v", err)
 	}
-	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Errorf("applied %d migrations, want 1", n)
+	if after := count(); after != before {
+		t.Errorf("second migrate applied %d more migrations", after-before)
 	}
 }
 
@@ -51,7 +64,10 @@ func TestLoadLessons(t *testing.T) {
 	ctx := context.Background()
 
 	l := lesson(1, "하나", "둘")
-	l.GrammarPoints = []seed.GrammarPoint{{ID: "fx", Title: "Fixture point"}}
+	l.GrammarPoints = []seed.GrammarPoint{{
+		ID: "fx", Title: "Fixture point",
+		Example: seed.Example{Korean: "하나예요.", English: "It is one."},
+	}}
 	l.Exercises = []seed.Exercise{{Kind: seed.KindFillBlank, GrammarPoint: "fx", Prompt: "___", Answer: []string{"a"}}}
 	l.Passages = []seed.Passage{{Korean: "text", Questions: []seed.PassageQuestion{{Q: "q", Reference: "r"}}}}
 
@@ -77,6 +93,24 @@ func TestLoadLessons(t *testing.T) {
 	}
 	if pointID != wantID {
 		t.Errorf("exercise grammar_point_id = %d, want %d", pointID, wantID)
+	}
+
+	// Schema v2 content: the chapter page reads intro, the grammar module reads
+	// the example. Both are written by the same load and easy to forget.
+	var intro, exKO, exEN string
+	if err := db.QueryRow(`SELECT intro FROM chapters`).Scan(&intro); err != nil {
+		t.Fatal(err)
+	}
+	if intro != "Fixture intro." {
+		t.Errorf("intro = %q, want the seeded text", intro)
+	}
+	if err := db.QueryRow(
+		`SELECT example_korean, example_english FROM grammar_points WHERE slug = 'fx'`,
+	).Scan(&exKO, &exEN); err != nil {
+		t.Fatal(err)
+	}
+	if exKO != "하나예요." || exEN != "It is one." {
+		t.Errorf("example = %q / %q, want the seeded pair", exKO, exEN)
 	}
 }
 

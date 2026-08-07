@@ -1,9 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "book": "Fixture Book",
   "lesson": 2,
   "position": 2,
   "title": "Fixture lesson two",
+  "intro": "Fixture intro: what this chapter is for.",
   "allowExtra": ["은", "는"],
   "vocab": [
     {
@@ -19,7 +20,8 @@
     {
       "id": "fx-topic",
       "title": "Fixture topic marker",
-      "explanation": "Placeholder explanation for parser tests."
+      "explanation": "Placeholder explanation for parser tests.",
+      "example": { "korean": "셋은 고양이", "english": "Three is a cat (fixture)." }
     }
   ],
   "exercises": [

@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "book": "Fixture Book",
   "lesson": 2,
   "position": 7,
   "title": "Fixture B",
+  "intro": "Fixture intro: what this chapter is for.",
   "vocab": [{ "korean": "나", "english": ["b"], "pos": "noun", "irregular": null }]
 }

@@ -1,9 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "book": "Fixture Book",
   "lesson": 1,
   "position": 1,
   "title": "Fixture lesson one",
+  "intro": "Fixture intro: what this chapter is for.",
   "vocab": [
     {
       "korean": "하나",

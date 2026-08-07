@@ -68,7 +68,7 @@ func TestParseNormalizesToNFC(t *testing.T) {
 	const decomposed = "\u1112\u1161\u11AB" // ㅎ + ㅏ + ㄴ
 	const composed = "\uD55C"               // 한
 
-	src := `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+	src := `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t","intro":"i",
 		"vocab":[{"korean":"` + decomposed + `","english":["one"],"pos":"noun","irregular":null}]}`
 
 	l, err := Parse("nfc.json", []byte(src))
@@ -88,70 +88,95 @@ func TestParseErrors(t *testing.T) {
 	}{
 		{
 			name: "malformed json",
-			json: `{"schemaVersion":1,`,
+			json: `{"schemaVersion":2,`,
 			want: "unexpected EOF",
 		},
 		{
 			name: "future schema version",
-			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t"}`,
-			want: "schemaVersion 2",
+			json: `{"schemaVersion":3,"book":"b","lesson":1,"position":1,"title":"t"}`,
+			want: "schemaVersion 3",
 		},
 		{
 			// Note: encoding/json matches field names case-insensitively, so a
 			// wrong-case key ("speechlevel") still binds correctly and is not
 			// an error. Only a genuinely different name is caught.
 			name: "misspelled field",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"vocab":[{"korean":"가","english":["a"],"pos":"noun","speach_level":"polite"}]}`,
 			want: "speach_level",
 		},
 		{
 			name: "missing position",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"title":"t"}`,
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"title":"t"}`,
 			want: "position must be >= 1",
 		},
 		{
 			name: "duplicate vocab",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"vocab":[{"korean":"가","english":["a"],"pos":"noun"},
 				         {"korean":"가","english":["b"],"pos":"noun"}]}`,
 			want: "duplicates vocab[0]",
 		},
 		{
 			name: "vocab without gloss",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"vocab":[{"korean":"가","english":[],"pos":"noun"}]}`,
 			want: "english gloss",
 		},
 		{
 			name: "unknown exercise kind",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"exercises":[{"kind":"dictation","prompt":"p","answer":["a"]}]}`,
 			want: `unknown kind "dictation"`,
 		},
 		{
 			name: "exercise references undeclared grammar point",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"exercises":[{"kind":"fill_blank","grammarPoint":"nope","prompt":"p","answer":["a"]}]}`,
 			want: "not declared",
 		},
 		{
 			name: "duplicate exercise prompt",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"exercises":[{"kind":"fill_blank","prompt":"p","answer":["a"]},
 				             {"kind":"fill_blank","prompt":"p","answer":["b"]}]}`,
 			want: "same kind and prompt as exercises[0]",
 		},
 		{
 			name: "duplicate passage",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"passages":[{"korean":"k","questions":[{"q":"q","reference":"r"}]},
 				            {"korean":"k","questions":[{"q":"q2","reference":"r"}]}]}`,
 			want: "same korean text as passages[0]",
 		},
 		{
+			name: "missing intro",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t"}`,
+			want: "intro is empty",
+		},
+		{
+			name: "grammar point without an example",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t","intro":"i",
+				"grammarPoints":[{"id":"g1","title":"T","explanation":"e"}]}`,
+			want: "example.korean is empty",
+		},
+		{
+			name: "grammar example without a translation",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t","intro":"i",
+				"grammarPoints":[{"id":"g1","title":"T","explanation":"e",
+				                  "example":{"korean":"저는 학생이에요."}}]}`,
+			want: "example.english is empty",
+		},
+		{
+			name: "coverage exemption for a word the lesson does not teach",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t","intro":"i",
+				"coverageExempt":["없다"],
+				"vocab":[{"korean":"가","english":["a"],"pos":"noun"}]}`,
+			want: `"없다" is not vocabulary in this lesson`,
+		},
+		{
 			name: "passage question without reference",
-			json: `{"schemaVersion":1,"book":"b","lesson":1,"position":1,"title":"t",
+			json: `{"schemaVersion":2,"book":"b","lesson":1,"position":1,"title":"t",
 				"passages":[{"korean":"k","questions":[{"q":"q","reference":""}]}]}`,
 			want: "reference is empty",
 		},
@@ -172,7 +197,7 @@ func TestParseErrors(t *testing.T) {
 
 // Every problem in a file should surface in one run, not one per fix-and-rerun.
 func TestValidateReportsAllErrors(t *testing.T) {
-	const src = `{"schemaVersion":1,"book":"","lesson":0,"position":0,"title":""}`
+	const src = `{"schemaVersion":2,"book":"","lesson":0,"position":0,"title":""}`
 	_, err := Parse("x.json", []byte(src))
 	if err == nil {
 		t.Fatal("Parse succeeded, want error")

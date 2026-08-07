@@ -17,12 +17,14 @@ content/
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "book": "Integrated Korean Beginner 1",
   "lesson": 1,
   "position": 1,                       // global order across ALL books, unique
   "title": "인사 — Greetings",
+  "intro": "Greeting people and ...",  // English. Required. What this chapter is for.
   "allowExtra": ["은", "는"],           // tokens the lexicon lint should ignore
+  "coverageExempt": [],                // vocab excused from the comprehension rule
   "vocab": [
     {
       "korean": "안녕하세요",
@@ -34,7 +36,15 @@ content/
     }
   ],
   "grammarPoints": [
-    { "id": "g1-copula", "title": "N이에요/예요", "explanation": "..." }
+    {
+      "id": "g1-copula",
+      "title": "N이에요/예요",
+      "explanation": "...",
+      "example": {                     // exactly one, both halves required
+        "korean": "저는 학생이에요.",
+        "english": "I am a student."
+      }
+    }
   ],
   "exercises": [
     {
@@ -65,6 +75,12 @@ field means content that never appears in study:
 - Vocab is unique per lesson by `korean`; exercises by `(kind, prompt)`;
   passages by `korean`. Duplicates would overwrite each other on load.
 - `grammarPoint` on an exercise must name a `grammarPoints` id in the same file.
+- `intro` is required and non-empty: it is what the chapter page opens with.
+- Every grammar point needs exactly one `example`, with both `korean` and
+  `english`. The field is an object, not a list — the grammar module shows one
+  example and then starts drilling.
+- Every `coverageExempt` entry must be a `korean` word this lesson teaches, so
+  an exemption cannot outlive the word it was written for.
 - Every passage question needs a `reference` answer — it is what the grader
   compares against, and it is never shown before answering.
 - Text is normalized to Unicode NFC on load, so decomposed Hangul pasted from

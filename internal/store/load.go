@@ -48,14 +48,15 @@ func (db *DB) LoadLessons(ctx context.Context, lessons []seed.Lesson) error {
 func loadLesson(ctx context.Context, tx *sql.Tx, l seed.Lesson, now string) error {
 	var chapterID int64
 	err := tx.QueryRowContext(ctx, `
-		INSERT INTO chapters (book, lesson_no, position, title, retired_at)
-		VALUES (?, ?, ?, ?, NULL)
+		INSERT INTO chapters (book, lesson_no, position, title, intro, retired_at)
+		VALUES (?, ?, ?, ?, ?, NULL)
 		ON CONFLICT (book, lesson_no) DO UPDATE SET
 			position   = excluded.position,
 			title      = excluded.title,
+			intro      = excluded.intro,
 			retired_at = NULL
 		RETURNING id`,
-		l.Book, l.LessonNo, l.Position, l.Title,
+		l.Book, l.LessonNo, l.Position, l.Title, l.Intro,
 	).Scan(&chapterID)
 	if err != nil {
 		return fmt.Errorf("upsert chapter: %w", err)
@@ -98,14 +99,16 @@ func loadLesson(ctx context.Context, tx *sql.Tx, l seed.Lesson, now string) erro
 	for _, g := range l.GrammarPoints {
 		var id int64
 		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO grammar_points (chapter_id, slug, title, explanation, retired_at)
-			VALUES (?, ?, ?, ?, NULL)
+			INSERT INTO grammar_points (chapter_id, slug, title, explanation, example_korean, example_english, retired_at)
+			VALUES (?, ?, ?, ?, ?, ?, NULL)
 			ON CONFLICT (chapter_id, slug) DO UPDATE SET
-				title       = excluded.title,
-				explanation = excluded.explanation,
-				retired_at  = NULL
+				title           = excluded.title,
+				explanation     = excluded.explanation,
+				example_korean  = excluded.example_korean,
+				example_english = excluded.example_english,
+				retired_at      = NULL
 			RETURNING id`,
-			chapterID, g.ID, g.Title, g.Explanation,
+			chapterID, g.ID, g.Title, g.Explanation, g.Example.Korean, g.Example.English,
 		).Scan(&id); err != nil {
 			return fmt.Errorf("upsert grammar point %q: %w", g.ID, err)
 		}

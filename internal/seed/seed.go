@@ -18,7 +18,7 @@ import (
 
 // SchemaVersion is the only seed schema this binary understands. Bump it in
 // lockstep with a migration when the shape changes.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // Lesson is one seed file: a single lesson of a single textbook.
 type Lesson struct {
@@ -29,13 +29,21 @@ type Lesson struct {
 	// Content is "unlocked" when its position is at or below the current one.
 	Position int    `json:"position"`
 	Title    string `json:"title"`
+	// Intro is the English overview shown before anything is studied: what this
+	// chapter is for and what you should be able to do afterwards. English on
+	// purpose — it is the one place the goal matters more than the immersion.
+	Intro string `json:"intro"`
 	// AllowExtra lists tokens the lexicon lint should not flag for this lesson —
 	// particles and inflections that will never match an earlier dictionary form.
-	AllowExtra    []string       `json:"allowExtra,omitempty"`
-	Vocab         []Vocab        `json:"vocab"`
-	GrammarPoints []GrammarPoint `json:"grammarPoints,omitempty"`
-	Exercises     []Exercise     `json:"exercises,omitempty"`
-	Passages      []Passage      `json:"passages,omitempty"`
+	AllowExtra []string `json:"allowExtra,omitempty"`
+	// CoverageExempt names vocabulary deliberately left out of the comprehension
+	// coverage requirement. Every entry must be a Korean word this lesson
+	// teaches, so an exemption cannot outlive the word it was written for.
+	CoverageExempt []string       `json:"coverageExempt,omitempty"`
+	Vocab          []Vocab        `json:"vocab"`
+	GrammarPoints  []GrammarPoint `json:"grammarPoints,omitempty"`
+	Exercises      []Exercise     `json:"exercises,omitempty"`
+	Passages       []Passage      `json:"passages,omitempty"`
 }
 
 // Vocab is one dictionary entry. The grammatical metadata is carried from the
@@ -61,6 +69,16 @@ type GrammarPoint struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Explanation string `json:"explanation"`
+	// Example is the one worked example shown before the point is drilled.
+	// Singular by design: the grammar module shows an example and then moves to
+	// practice, and a list here is how a chapter turns into a textbook.
+	Example Example `json:"example"`
+}
+
+// Example is a sentence and its translation.
+type Example struct {
+	Korean  string `json:"korean"`
+	English string `json:"english"`
 }
 
 // Exercise kinds. An unknown kind is rejected at parse time rather than stored,
@@ -132,6 +150,11 @@ func (l Lesson) validate() error {
 	if strings.TrimSpace(l.Title) == "" {
 		bad("title is empty")
 	}
+	if strings.TrimSpace(l.Intro) == "" {
+		// The chapter page leads with this. A blank one is a chapter that opens
+		// on nothing and never says what it is for.
+		bad("intro is empty")
+	}
 	if l.LessonNo < 1 {
 		bad("lesson must be >= 1, got %d", l.LessonNo)
 	}
@@ -171,6 +194,22 @@ func (l Lesson) validate() error {
 		}
 		if strings.TrimSpace(g.Title) == "" {
 			bad("grammarPoints[%d] (%s): title is empty", i, g.ID)
+		}
+		if strings.TrimSpace(g.Example.Korean) == "" {
+			bad("grammarPoints[%d] (%s): example.korean is empty", i, g.ID)
+		}
+		if strings.TrimSpace(g.Example.English) == "" {
+			// Without a translation the example teaches nothing on its own, and
+			// the grammar module shows it before any practice.
+			bad("grammarPoints[%d] (%s): example.english is empty", i, g.ID)
+		}
+	}
+
+	// An exemption for a word the lesson does not teach is dead config that will
+	// silently stop exempting anything the moment the word is renamed.
+	for i, word := range l.CoverageExempt {
+		if seenKorean[word] == 0 {
+			bad("coverageExempt[%d]: %q is not vocabulary in this lesson", i, word)
 		}
 	}
 
