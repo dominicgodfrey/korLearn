@@ -112,16 +112,26 @@ func runLint(dir string) error {
 		return err
 	}
 
+	// Two checks with deliberately different weight. Vocabulary sequencing is a
+	// heuristic over an agglutinative language and can only advise; coverage is
+	// a set comparison and can be trusted to fail the run.
 	findings := lint.Run(lessons)
 	for _, f := range findings {
 		fmt.Println(f)
 	}
-	if len(findings) == 0 {
-		fmt.Printf("%d lessons checked, nothing to review\n", len(lessons))
-		return nil
+	gaps := lint.Coverage(lessons)
+	if len(gaps) > 0 {
+		fmt.Println()
+		for _, g := range gaps {
+			fmt.Println(g)
+		}
 	}
-	fmt.Printf("\n%d lessons checked, %d to review (warnings only, nothing is blocked)\n",
-		len(lessons), len(findings))
+
+	fmt.Printf("\n%d lessons checked: %d to review, %d coverage gap(s)\n",
+		len(lessons), len(findings), len(gaps))
+	if len(gaps) > 0 {
+		return fmt.Errorf("%d coverage gap(s): every word and grammar point must be exercised by its chapter's comprehension passages", len(gaps))
+	}
 	return nil
 }
 

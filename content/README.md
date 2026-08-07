@@ -58,7 +58,13 @@ content/
   "passages": [
     {
       "korean": "...",
-      "questions": [{ "q": "...", "reference": "..." }]
+      "questions": [
+        {
+          "q": "...",
+          "reference": "...",
+          "grammarPoints": ["g1-copula"]  // which patterns this question elicits
+        }
+      ]
     }
   ]
 }
@@ -83,6 +89,26 @@ field means content that never appears in study:
   an exemption cannot outlive the word it was written for.
 - Every passage question needs a `reference` answer — it is what the grader
   compares against, and it is never shown before answering.
+- `grammarPoints` on a question must name ids declared in the same file.
+
+## The coverage rule
+
+Comprehension is the chapter's integration test, so `korlearn lint` **fails**
+(rather than warning) when a chapter teaches something its passages never
+exercise:
+
+- every vocab word must appear in some passage's text, question, or reference
+  answer, in any inflected form;
+- every grammar point must be named in some question's `grammarPoints`.
+
+Coverage is computed across the chapter's whole passage set, not per passage —
+a typical lesson has more vocabulary than one natural passage can carry, so
+expect to write two or three. Naming a grammar point is authoring intent, not
+proof: nothing can force an answer to use the pattern, and the grader's rubric
+is what notices when one dodges it.
+
+`coverageExempt` excuses a word from the rule. Keep the list short enough to
+read.
 - Text is normalized to Unicode NFC on load, so decomposed Hangul pasted from
   another tool is safe.
 

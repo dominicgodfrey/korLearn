@@ -196,7 +196,10 @@ flags **from day one** so Intermediate 1 doesn't force a schema migration later.
                       "example": { "korean": "저는 학생이에요.", "english": "I am a student." } }],
   "exercises": [{ "kind": "fill_blank", "grammarPoint": "g1-copula",
                   "prompt": "저는 학생___.", "answer": ["이에요"] }],
-  "passages": [{ "korean": "...", "questions": [{ "q": "...", "reference": "..." }] }],
+  "passages": [{ "korean": "...", "questions": [
+      // grammarPoints names the patterns the question is written to elicit;
+      // it is what the coverage check reads.
+      { "q": "...", "reference": "...", "grammarPoints": ["g1-copula"] }] }],
   // Vocab deliberately left out of the comprehension coverage requirement,
   // with the reason. Empty for most chapters; see Coverage lint.
   "coverageExempt": []
@@ -239,15 +242,19 @@ and more honest than pretending it did not happen.
 The comprehension rule — every vocab word and grammar point exercised at least once — is
 mechanically checkable, so `korlearn lint` checks it and this one **fails**, unlike the lexicon
 warning. Per chapter: each vocab entry must appear in some passage's text, question, or reference
-answer, and each grammar point must be reachable from some passage question. Words listed in
+answer, and each grammar point must be named in some question's `grammarPoints`. Words listed in
 `coverageExempt` are skipped, and the list is meant to stay short enough to read.
+
+Vocabulary matching here is looser than the lexicon matcher, and the asymmetry is deliberate. That
+matcher guards against over-matching, because a false match hides a word taught too early. This one
+blocks a build, so a false *miss* is the expensive direction — 물 appearing as 물을 is a use of 물 —
+and short words get the prefix matching the lexicon matcher withholds.
 
 Two honest consequences to expect while authoring. A typical Integrated Korean lesson has ~30 vocab
 entries, which is more than one natural passage can carry — chapters will need two or three
-passages, and coverage is computed across the set, not per passage. And "grammar point covered" can
-only mean the question was *designed* to elicit it; nothing can force the answer to use it. The
-reference answer is what the check reads, and the grader's rubric is what actually notices when
-your answer dodged the pattern.
+passages, and coverage is computed across the set, not per passage. And naming a grammar point on a
+question is authoring intent, not proof: nothing can force an answer to use the pattern. The
+grader's rubric is what actually notices when your answer dodged it.
 
 ## Phase 0 — Schema and shell (before any module UI)
 

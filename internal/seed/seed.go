@@ -111,6 +111,12 @@ type PassageQuestion struct {
 	// Reference is a model answer given to the grader as context, never shown
 	// to the user before they answer.
 	Reference string `json:"reference"`
+	// GrammarPoints names the patterns this question is written to elicit,
+	// referencing GrammarPoint.ID in the same lesson. This is authoring intent,
+	// not a guarantee — nothing can force an answer to use a pattern — but it
+	// is what the coverage check reads, and the grader's rubric is what
+	// notices when an answer dodges it.
+	GrammarPoints []string `json:"grammarPoints,omitempty"`
 }
 
 // Parse reads one seed file. name is used only in error messages.
@@ -257,6 +263,11 @@ func (l Lesson) validate() error {
 			if strings.TrimSpace(q.Reference) == "" {
 				// The grader has nothing to compare against without one.
 				bad("passages[%d].questions[%d]: reference is empty", i, j)
+			}
+			for k, id := range q.GrammarPoints {
+				if !points[id] {
+					bad("passages[%d].questions[%d].grammarPoints[%d]: %q is not declared in this lesson", i, j, k, id)
+				}
 			}
 		}
 	}
